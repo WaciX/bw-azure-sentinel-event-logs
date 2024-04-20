@@ -9,7 +9,7 @@
       "value": "westeurope"
     },
     "workspace": {
-      "value": "Bitwarden"
+      "value": "Bitwarden3"
     },
     "resourceGroupName": {
       "value": "[resourceGroup().name]"

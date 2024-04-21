@@ -44,7 +44,7 @@
     },
     "variables": {
         "_solutionName": "Bitwarden Event Logs",
-        "_solutionVersion": "0.0.5",
+        "_solutionVersion": "0.0.6",
         "solutionId": "bitwarden.azure-sentinel-solution-bitwarden-event-logs",
         "_solutionId": "[variables('solutionId')]",
         "workspaceResourceId": "[resourceId('microsoft.OperationalInsights/Workspaces', parameters('workspace'))]",
@@ -201,7 +201,7 @@
                             }
                         },
                         {
-                            "name": "BitwardenOauthDCR1",
+                            "name": "Bitwarden_OauthDCR",
                             "apiVersion": "2022-06-01",
                             "type": "Microsoft.Insights/dataCollectionRules",
                             "location": "[parameters('workspace-location')]",
@@ -209,7 +209,7 @@
                             "properties": {
                                 "dataCollectionEndpointId": "[variables('dataCollectionEndpointId1')]",
                                 "streamDeclarations": {
-                                    "Custom-Bitwarden_ClientCredentials": {
+                                    "Custom-BitwardenEventLogs_ClientCredentials": {
                                         "columns": [
                                             {
                                                 "name": "date",
@@ -267,6 +267,30 @@
                                                 "description": "The IP address of the acting user"
                                             }
                                         ]
+                                    },
+                                    "Custom-BitwardenMembers_ClientCredentials": {
+                                        "columns": [
+                                            {
+                                                "name": "id",
+                                                "type": "string",
+                                                "description": "Member Id"
+                                            },
+                                            {
+                                                "name": "userId",
+                                                "type": "string",
+                                                "description": "Member User Id"
+                                            },
+                                            {
+                                                "name": "email",
+                                                "type": "string",
+                                                "description": "Member Email"
+                                            },
+                                            {
+                                                "name": "name",
+                                                "type": "string",
+                                                "description": "Member Name"
+                                            }
+                                        ]
                                     }
                                 },
                                 "destinations": {
@@ -280,13 +304,23 @@
                                 "dataFlows": [
                                     {
                                         "streams": [
-                                            "Custom-Bitwarden_ClientCredentials"
+                                            "Custom-BitwardenEventLogs_ClientCredentials"
                                         ],
                                         "destinations": [
                                             "clv2ws1"
                                         ],
-                                        "transformKql": "source | extend DeviceNamesJson = parse_json(\"{\\\"0\\\":\\\"Android\\\",\\\"1\\\":\\\"iOS\\\",\\\"2\\\":\\\"Chrome Extension\\\",\\\"3\\\":\\\"Firefox Extension\\\",\\\"4\\\":\\\"Opera Extension\\\",\\\"5\\\":\\\"Edge Extension\\\",\\\"6\\\":\\\"Windows\\\",\\\"7\\\":\\\"macOS\\\",\\\"8\\\":\\\"Linux\\\",\\\"9\\\":\\\"Chrome\\\",\\\"10\\\":\\\"Firefox\\\",\\\"11\\\":\\\"Opera\\\",\\\"12\\\":\\\"Edge\\\",\\\"13\\\":\\\"Internet Explorer\\\",\\\"14\\\":\\\"Unknown Browser\\\",\\\"15\\\":\\\"Android\\\",\\\"16\\\":\\\"UWP\\\",\\\"17\\\":\\\"Safari\\\",\\\"18\\\":\\\"Vivaldi\\\",\\\"19\\\":\\\"Vivaldi Extension\\\",\\\"20\\\":\\\"Safari Extension\\\",\\\"21\\\":\\\"SDK\\\",\\\"22\\\":\\\"Server\\\",\\\"23\\\":\\\"Windows CLI\\\",\\\"24\\\":\\\"MacOs CLI\\\",\\\"25\\\":\\\"Linux CLI\\\"}\") | extend deviceName = tostring(DeviceNamesJson[tostring(device)]) | project TimeGenerated = todatetime([\"date\"]), EventType = type, itemId, collectionId, groupId, policyId, memberId, actingUserId, installationId, device, deviceName, ipAddress",
+                                        "transformKql": "source | project TimeGenerated = todatetime([\"date\"]), EventType = type, itemId, collectionId, groupId, policyId, memberId, actingUserId, installationId, device, ipAddress",
                                         "outputStream": "Custom-BitwardenEventLogs_CL"
+                                    },
+                                    {
+                                        "streams": [
+                                            "Custom-BitwardenMembers_ClientCredentials"
+                                        ],
+                                        "destinations": [
+                                            "clv2ws1"
+                                        ],
+                                        "transformKql": "source | project TimeGenerated = now(), memberId = id, userId, email, name",
+                                        "outputStream": "Custom-BitwardenMembers_CL"
                                     }
                                 ]
                             }
@@ -353,14 +387,50 @@
                                             "description": "Device Id"
                                         },
                                         {
-                                            "name": "deviceName",
-                                            "type": "string",
-                                            "description": "Device Name"
-                                        },
-                                        {
                                             "name": "ipAddress",
                                             "type": "string",
                                             "description": "The IP address of the acting user"
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "BitwardenMembers_CL",
+                            "apiVersion": "2022-10-01",
+                            "type": "Microsoft.OperationalInsights/workspaces/tables",
+                            "location": "[parameters('workspace-location')]",
+                            "kind": null,
+                            "properties": {
+                                "retentionInDays": 4,
+                                "schema": {
+                                    "name": "BitwardenMembers_CL",
+                                    "columns": [
+                                        {
+                                            "name": "TimeGenerated",
+                                            "type": "Datetime",
+                                            "isDefaultDisplay": true,
+                                            "description": "The timestamp (UTC) reflecting the time in which the event was generated."
+                                        },
+                                        {
+                                            "name": "memberId",
+                                            "type": "string",
+                                            "description": "Member Id"
+                                        },
+                                        {
+                                            "name": "userId",
+                                            "type": "string",
+                                            "description": "Member User Id"
+                                        },
+                                        {
+                                            "name": "email",
+                                            "type": "string",
+                                            "description": "Member Email"
+                                        },
+                                        {
+                                            "name": "name",
+                                            "type": "string",
+                                            "description": "Member Name"
                                         }
                                     ]
                                 }
@@ -588,7 +658,7 @@
                                 "connectorDefinitionName": "BitwardenEventLogs",
                                 "dataType": "BitwardenEventLogs_CL",
                                 "dcrConfig": {
-                                    "streamName": "Custom-Bitwarden_ClientCredentials",
+                                    "streamName": "Custom-BitwardenEventLogs_ClientCredentials",
                                     "dataCollectionEndpoint": "[[parameters('dcrConfig').dataCollectionEndpoint]",
                                     "dataCollectionRuleImmutableId": "[[parameters('dcrConfig').dataCollectionRuleImmutableId]"
                                 },
@@ -610,6 +680,55 @@
                                     "queryTimeFormat": "yyyy-MM-ddTHH:mm:ss.000000Z",
                                     "startTimeAttributeName": "start",
                                     "endTimeAttributeName": "end",
+                                    "rateLimitQps": 1,
+                                    "retryCount": 3,
+                                    "timeoutInSeconds": 30,
+                                    "headers": {
+                                        "Accept": "application/json"
+                                    }
+                                },
+                                "response": {
+                                    "eventsJsonPaths": [
+                                        "$.data"
+                                    ],
+                                    "format": "json"
+                                },
+                                "paging": {
+                                    "pagingType": "NextPageToken",
+                                    "nextPageParaName": "continuationToken",
+                                    "nextPageTokenJsonPath": "$.continuationToken"
+                                }
+                            }
+                        },
+                        {
+                            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/', 'BitwardenMembers')]",
+                            "apiVersion": "2023-02-01-preview",
+                            "type": "Microsoft.OperationalInsights/workspaces/providers/dataConnectors",
+                            "location": "[parameters('workspace-location')]",
+                            "kind": "RestApiPoller",
+                            "properties": {
+                                "connectorDefinitionName": "BitwardenEventLogs",
+                                "dataType": "BitwardenMembers_CL",
+                                "dcrConfig": {
+                                    "streamName": "Custom-BitwardenMembers_ClientCredentials",
+                                    "dataCollectionEndpoint": "[[parameters('dcrConfig').dataCollectionEndpoint]",
+                                    "dataCollectionRuleImmutableId": "[[parameters('dcrConfig').dataCollectionRuleImmutableId]"
+                                },
+                                "auth": {
+                                    "type": "OAuth2",
+                                    "ClientSecret": "[[parameters('ClientSecret')]",
+                                    "ClientId": "[[parameters('ClientId')]",
+                                    "GrantType": "client_credentials",
+                                    "TokenEndpoint": "https://identity.bitwarden.com/connect/token",
+                                    "TokenEndpointHeaders": {
+                                        "Content-Type": "application/x-www-form-urlencoded"
+                                    },
+                                    "scope": "api.organization"
+                                },
+                                "request": {
+                                    "apiEndpoint": "https://api.bitwarden.com/public/members",
+                                    "httpMethod": "GET",
+                                    "queryWindowInMin": 5,
                                     "rateLimitQps": 1,
                                     "retryCount": 3,
                                     "timeoutInSeconds": 30,
